@@ -1,5 +1,6 @@
 # CoraOS Build Pipeline
-# Compiles all components, builds RPMs, and attempts ISO creation
+# Compiles all components, validates assets, builds RPMs
+# ISO build runs on self-hosted runner only (requires root + loop devices)
 name: CoraOS Build
 
 on:
@@ -56,7 +57,6 @@ jobs:
         run: |
           echo "=== Staging directory contents ==="
           find "${GITHUB_WORKSPACE}/staging" -type f | head -30
-          echo "..."
           echo "Total files: $(find "${GITHUB_WORKSPACE}/staging" -type f | wc -l)"
 
       - name: Upload build artifacts
@@ -102,33 +102,22 @@ jobs:
           cp -a . /tmp/coraos-shell-1.0.0/
           tar czf "${RPM_TOPDIR}/SOURCES/coraos-shell-1.0.0.tar.gz" \
             -C /tmp coraos-shell-1.0.0
-          echo "Source tarball created at: ${RPM_TOPDIR}/SOURCES/"
-          ls -la "${RPM_TOPDIR}/SOURCES/"
 
       - name: Build shell RPM
         run: |
-          RPM_TOPDIR="$(rpm --eval '%{_topdir}')"
           rpmbuild -ba build/specs/coraos-shell.spec 2>&1 || echo "::warning::RPM build had issues (spec may need updates)"
-
-      - name: Debug - find RPM output
-        run: |
-          RPM_TOPDIR="$(rpm --eval '%{_topdir}')"
-          echo "=== RPM output ==="
-          find "${RPM_TOPDIR}" -name "*.rpm" -type f 2>/dev/null || echo "No RPMs found"
-          echo ""
-          echo "=== Full RPMS dir ==="
-          ls -laR "${RPM_TOPDIR}/RPMS/" 2>/dev/null || echo "RPMS dir empty or missing"
 
       - name: Collect RPMs to workspace
         run: |
           RPM_TOPDIR="$(rpm --eval '%{_topdir}')"
           mkdir -p "${GITHUB_WORKSPACE}/rpm-output"
           find "${RPM_TOPDIR}" -name "*.rpm" -exec cp {} "${GITHUB_WORKSPACE}/rpm-output/" \; 2>/dev/null
-          # If no RPMs were built, create a marker file so upload doesn't fail completely
           if [ -z "$(ls -A "${GITHUB_WORKSPACE}/rpm-output/" 2>/dev/null)" ]; then
             echo "No RPMs were produced. Check spec file." > "${GITHUB_WORKSPACE}/rpm-output/BUILD_NOTE.txt"
           fi
-          ls -la "${GITHUB_WORKSPACE}/rpm-output/"
+
+      - name: Debug - RPM output
+        run: ls -la "${GITHUB_WORKSPACE}/rpm-output/"
 
       - name: Upload RPMs
         uses: actions/upload-artifact@v4
@@ -138,61 +127,83 @@ jobs:
           retention-days: 7
           if-no-files-found: warn
 
-  # === Job 3: Build Live ISO ===
-  iso:
+  # === Job 3: Build Live ISO (self-hosted runner only) ===
+  build-iso:
     name: Build Live ISO
-    runs-on: ubuntu-latest
-    container:
-      image: fedora:41
-      options: --privileged
+    runs-on: self-hosted
     needs: build
+    # Only run on push to main (not PRs) to save self-hosted resources
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    timeout-minutes: 60
 
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
 
-      - name: Check if running privileged
+      - name: Verify environment
         run: |
-          echo "=== Privilege check ==="
-          if [ -w /dev/loop0 ] || [ -e /dev/loop-control ]; then
-            echo "::notice::Container appears to have loop device access (privileged)"
-          else
-            echo "::warning::Container may lack privileges for ISO creation"
+          echo "=== ISO Build Environment Check ==="
+          echo "Runner: $(hostname)"
+          echo "User: $(id)"
+          echo "OS: $(cat /etc/os-release | grep PRETTY_NAME | cut -d= -f2)"
+          echo ""
+
+          # Check required tools
+          MISSING=""
+          for tool in meson ninja gcc livemedia-creator mksquashfs; do
+            if ! command -v "$tool" &>/dev/null; then
+              MISSING="${MISSING} ${tool}"
+            fi
+          done
+
+          if [ -n "$MISSING" ]; then
+            echo "::error::Missing tools:${MISSING}"
+            echo "Install with: sudo dnf install meson ninja-build gcc lorax squashfs-tools"
+            echo "Plus all CoraOS build deps (see README.md)"
+            exit 1
           fi
-          id
-          cat /proc/self/status | grep -i cap || true
 
-      - name: Install ISO build tools
-        run: |
-          dnf install -y --setopt=install_weak_deps=False \
-            lorax livecd-tools \
-            meson ninja-build gcc gcc-c++ pkg-config \
-            gtk4-devel libadwaita-devel glib2-devel \
-            json-glib-devel cairo-devel pango-devel \
-            NetworkManager-libnm-devel \
-            webkitgtk6.0-devel \
-            desktop-file-utils findutils \
-            squashfs-tools \
-            grub2-efi-x64 shim-x64 \
-            dracut dracut-live \
-            e2fsprogs dosfstools parted
+          # Check loop device access
+          if [ ! -e /dev/loop-control ]; then
+            echo "::error::No loop device access. ISO build requires root."
+            exit 1
+          fi
 
-      - name: Build and install CoraOS
+          echo "All checks passed - ready to build ISO"
+
+      - name: Install build dependencies (if needed)
         run: |
-          meson setup builddir --prefix=/usr --buildtype=release
+          if ! rpm -q gtk4-devel &>/dev/null; then
+            sudo dnf install -y --setopt=install_weak_deps=False \
+              meson ninja-build gcc gcc-c++ pkg-config \
+              gtk4-devel libadwaita-devel glib2-devel \
+              json-glib-devel cairo-devel pango-devel \
+              NetworkManager-libnm-devel \
+              webkitgtk6.0-devel \
+              desktop-file-utils findutils \
+              lorax livecd-tools squashfs-tools \
+              grub2-efi-x64 shim-x64 \
+              dracut dracut-live \
+              e2fsprogs dosfstools parted
+          else
+            echo "Build dependencies already installed"
+          fi
+
+      - name: Build CoraOS
+        run: |
+          meson setup builddir --prefix=/usr --buildtype=release --wipe 2>/dev/null || \
+            meson setup builddir --prefix=/usr --buildtype=release
           ninja -C builddir
-          DESTDIR="${GITHUB_WORKSPACE}/iso-rootfs" ninja -C builddir install
-          echo "Installed files:"
-          find "${GITHUB_WORKSPACE}/iso-rootfs" -type f | wc -l
+          sudo DESTDIR="${GITHUB_WORKSPACE}/iso-rootfs" ninja -C builddir install
 
-      - name: Attempt ISO creation
-        id: iso_build
+      - name: Build ISO with livemedia-creator
         run: |
           ISO_OUTPUT="${GITHUB_WORKSPACE}/iso-output"
+          sudo rm -rf "${ISO_OUTPUT}"
           mkdir -p "${ISO_OUTPUT}"
 
-          echo "::group::Running livemedia-creator"
-          livemedia-creator \
+          echo "Starting ISO build..."
+          sudo livemedia-creator \
             --ks=build/kickstart/coraos-live.ks \
             --no-virt \
             --resultdir="${ISO_OUTPUT}" \
@@ -201,57 +212,45 @@ jobs:
             --iso-only \
             --iso-name=CoraOS-1.0-Ember-x86_64.iso \
             --releasever=41 \
-            --macboot 2>&1 && echo "iso_created=true" >> "$GITHUB_OUTPUT" || {
-              echo "::endgroup::"
-              echo "::warning::ISO build failed. This is expected on GitHub-hosted runners."
-              echo "::warning::livemedia-creator requires full root privileges, loop devices,"
-              echo "::warning::and a complete Fedora package set. Use a self-hosted runner or"
-              echo "::warning::build locally with: sudo ./build/build-iso.sh"
-              echo "iso_created=false" >> "$GITHUB_OUTPUT"
-            }
-          echo "::endgroup::"
+            --macboot
 
-      - name: Debug - check ISO output
-        run: |
-          echo "=== ISO output directory ==="
-          ls -la "${GITHUB_WORKSPACE}/iso-output/" 2>/dev/null || echo "Directory missing"
-          find "${GITHUB_WORKSPACE}/iso-output" -name "*.iso" -type f 2>/dev/null || echo "No ISO found"
+          echo ""
+          echo "=== ISO Build Complete ==="
+          ls -lh "${ISO_OUTPUT}/"*.iso
 
-      - name: Create ISO build summary
-        if: steps.iso_build.outputs.iso_created != 'true'
-        run: |
-          mkdir -p "${GITHUB_WORKSPACE}/iso-output"
-          cat > "${GITHUB_WORKSPACE}/iso-output/ISO_BUILD_README.md" << 'EOF'
-          # CoraOS ISO Build
-
-          The ISO could not be built on GitHub-hosted runners due to privilege
-          restrictions. livemedia-creator requires:
-
-          - Root access
-          - Loop device support (/dev/loop*)
-          - Full Fedora package repository access
-          - ~4GB free disk space
-
-          ## Build locally:
-          ```bash
-          sudo ./build/build-iso.sh
-          ```
-
-          ## Or use a self-hosted runner with:
-          ```yaml
-          runs-on: self-hosted
-          ```
-          EOF
-
-      - name: Upload ISO (or build note)
+      - name: Upload ISO
         uses: actions/upload-artifact@v4
         with:
           name: coraos-iso
-          path: ${{ github.workspace }}/iso-output/
-          retention-days: 3
+          path: ${{ github.workspace }}/iso-output/*.iso
+          retention-days: 5
           if-no-files-found: warn
 
-  # === Job 4: Validate theme and data files ===
+  # === Job 4: ISO build notice (when self-hosted unavailable) ===
+  iso-notice:
+    name: ISO Build Status
+    runs-on: ubuntu-latest
+    needs: build
+    # This always runs - provides info when self-hosted isn't available
+    if: always() && needs.build.result == 'success'
+
+    steps:
+      - name: ISO build information
+        run: |
+          echo "## ISO Build" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "The CoraOS live ISO requires a **self-hosted runner** with:" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Root/sudo access" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Fedora 41+ with lorax installed" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Loop device support" >> "$GITHUB_STEP_SUMMARY"
+          echo "- ~4GB free disk space" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "### Build locally:" >> "$GITHUB_STEP_SUMMARY"
+          echo '```bash' >> "$GITHUB_STEP_SUMMARY"
+          echo "sudo ./build/build-iso.sh" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+  # === Job 5: Validate theme and data files ===
   validate:
     name: Validate Assets
     runs-on: ubuntu-latest
