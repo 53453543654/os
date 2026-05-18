@@ -1,5 +1,5 @@
 # CoraOS Build Pipeline
-# Compiles all components and builds a bootable live ISO
+# Compiles all components, builds RPMs, and attempts ISO creation
 name: CoraOS Build
 
 on:
@@ -33,7 +33,7 @@ jobs:
             NetworkManager-libnm-devel \
             webkitgtk6.0-devel \
             desktop-file-utils \
-            git
+            git findutils
 
       - name: Configure build
         run: meson setup builddir --prefix=/usr --buildtype=release
@@ -48,14 +48,24 @@ jobs:
           done
 
       - name: Install to staging directory
-        run: DESTDIR=${{ github.workspace }}/staging ninja -C builddir install
+        run: |
+          mkdir -p "${GITHUB_WORKSPACE}/staging"
+          DESTDIR="${GITHUB_WORKSPACE}/staging" ninja -C builddir install
+
+      - name: Debug - verify staging output
+        run: |
+          echo "=== Staging directory contents ==="
+          find "${GITHUB_WORKSPACE}/staging" -type f | head -30
+          echo "..."
+          echo "Total files: $(find "${GITHUB_WORKSPACE}/staging" -type f | wc -l)"
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
           name: coraos-build
-          path: staging/
+          path: ${{ github.workspace }}/staging/
           retention-days: 7
+          if-no-files-found: error
 
   # === Job 2: Build RPM packages ===
   rpm:
@@ -78,26 +88,53 @@ jobs:
             json-glib-devel cairo-devel pango-devel \
             NetworkManager-libnm-devel \
             webkitgtk6.0-devel \
-            desktop-file-utils
+            desktop-file-utils findutils
 
       - name: Setup RPM build tree
-        run: rpmdev-setuptree
+        run: |
+          rpmdev-setuptree
+          echo "RPM build root: $(rpm --eval '%{_topdir}')"
 
       - name: Create source tarball
         run: |
+          RPM_TOPDIR="$(rpm --eval '%{_topdir}')"
           mkdir -p /tmp/coraos-shell-1.0.0
           cp -a . /tmp/coraos-shell-1.0.0/
-          tar czf ~/rpmbuild/SOURCES/coraos-shell-1.0.0.tar.gz \
+          tar czf "${RPM_TOPDIR}/SOURCES/coraos-shell-1.0.0.tar.gz" \
             -C /tmp coraos-shell-1.0.0
+          echo "Source tarball created at: ${RPM_TOPDIR}/SOURCES/"
+          ls -la "${RPM_TOPDIR}/SOURCES/"
 
       - name: Build shell RPM
-        run: rpmbuild -ba build/specs/coraos-shell.spec || true
+        run: |
+          RPM_TOPDIR="$(rpm --eval '%{_topdir}')"
+          rpmbuild -ba build/specs/coraos-shell.spec 2>&1 || echo "::warning::RPM build had issues (spec may need updates)"
+
+      - name: Debug - find RPM output
+        run: |
+          RPM_TOPDIR="$(rpm --eval '%{_topdir}')"
+          echo "=== RPM output ==="
+          find "${RPM_TOPDIR}" -name "*.rpm" -type f 2>/dev/null || echo "No RPMs found"
+          echo ""
+          echo "=== Full RPMS dir ==="
+          ls -laR "${RPM_TOPDIR}/RPMS/" 2>/dev/null || echo "RPMS dir empty or missing"
+
+      - name: Collect RPMs to workspace
+        run: |
+          RPM_TOPDIR="$(rpm --eval '%{_topdir}')"
+          mkdir -p "${GITHUB_WORKSPACE}/rpm-output"
+          find "${RPM_TOPDIR}" -name "*.rpm" -exec cp {} "${GITHUB_WORKSPACE}/rpm-output/" \; 2>/dev/null
+          # If no RPMs were built, create a marker file so upload doesn't fail completely
+          if [ -z "$(ls -A "${GITHUB_WORKSPACE}/rpm-output/" 2>/dev/null)" ]; then
+            echo "No RPMs were produced. Check spec file." > "${GITHUB_WORKSPACE}/rpm-output/BUILD_NOTE.txt"
+          fi
+          ls -la "${GITHUB_WORKSPACE}/rpm-output/"
 
       - name: Upload RPMs
         uses: actions/upload-artifact@v4
         with:
           name: coraos-rpms
-          path: ~/rpmbuild/RPMS/
+          path: ${{ github.workspace }}/rpm-output/
           retention-days: 7
           if-no-files-found: warn
 
@@ -114,6 +151,17 @@ jobs:
       - name: Checkout source
         uses: actions/checkout@v4
 
+      - name: Check if running privileged
+        run: |
+          echo "=== Privilege check ==="
+          if [ -w /dev/loop0 ] || [ -e /dev/loop-control ]; then
+            echo "::notice::Container appears to have loop device access (privileged)"
+          else
+            echo "::warning::Container may lack privileges for ISO creation"
+          fi
+          id
+          cat /proc/self/status | grep -i cap || true
+
       - name: Install ISO build tools
         run: |
           dnf install -y --setopt=install_weak_deps=False \
@@ -123,35 +171,83 @@ jobs:
             json-glib-devel cairo-devel pango-devel \
             NetworkManager-libnm-devel \
             webkitgtk6.0-devel \
-            desktop-file-utils \
+            desktop-file-utils findutils \
             squashfs-tools \
             grub2-efi-x64 shim-x64 \
-            dracut dracut-live
+            dracut dracut-live \
+            e2fsprogs dosfstools parted
 
       - name: Build and install CoraOS
         run: |
           meson setup builddir --prefix=/usr --buildtype=release
           ninja -C builddir
-          DESTDIR=/tmp/coraos-rootfs ninja -C builddir install
+          DESTDIR="${GITHUB_WORKSPACE}/iso-rootfs" ninja -C builddir install
+          echo "Installed files:"
+          find "${GITHUB_WORKSPACE}/iso-rootfs" -type f | wc -l
 
-      - name: Create live ISO with livemedia-creator
+      - name: Attempt ISO creation
+        id: iso_build
         run: |
+          ISO_OUTPUT="${GITHUB_WORKSPACE}/iso-output"
+          mkdir -p "${ISO_OUTPUT}"
+
+          echo "::group::Running livemedia-creator"
           livemedia-creator \
             --ks=build/kickstart/coraos-live.ks \
             --no-virt \
-            --resultdir=/tmp/coraos-iso \
+            --resultdir="${ISO_OUTPUT}" \
             --project="CoraOS" \
             --volid="CoraOS-1-0" \
             --iso-only \
             --iso-name=CoraOS-1.0-Ember-x86_64.iso \
             --releasever=41 \
-            --macboot || echo "::warning::ISO build requires full privileges - see README for local build"
+            --macboot 2>&1 && echo "iso_created=true" >> "$GITHUB_OUTPUT" || {
+              echo "::endgroup::"
+              echo "::warning::ISO build failed. This is expected on GitHub-hosted runners."
+              echo "::warning::livemedia-creator requires full root privileges, loop devices,"
+              echo "::warning::and a complete Fedora package set. Use a self-hosted runner or"
+              echo "::warning::build locally with: sudo ./build/build-iso.sh"
+              echo "iso_created=false" >> "$GITHUB_OUTPUT"
+            }
+          echo "::endgroup::"
 
-      - name: Upload ISO
+      - name: Debug - check ISO output
+        run: |
+          echo "=== ISO output directory ==="
+          ls -la "${GITHUB_WORKSPACE}/iso-output/" 2>/dev/null || echo "Directory missing"
+          find "${GITHUB_WORKSPACE}/iso-output" -name "*.iso" -type f 2>/dev/null || echo "No ISO found"
+
+      - name: Create ISO build summary
+        if: steps.iso_build.outputs.iso_created != 'true'
+        run: |
+          mkdir -p "${GITHUB_WORKSPACE}/iso-output"
+          cat > "${GITHUB_WORKSPACE}/iso-output/ISO_BUILD_README.md" << 'EOF'
+          # CoraOS ISO Build
+
+          The ISO could not be built on GitHub-hosted runners due to privilege
+          restrictions. livemedia-creator requires:
+
+          - Root access
+          - Loop device support (/dev/loop*)
+          - Full Fedora package repository access
+          - ~4GB free disk space
+
+          ## Build locally:
+          ```bash
+          sudo ./build/build-iso.sh
+          ```
+
+          ## Or use a self-hosted runner with:
+          ```yaml
+          runs-on: self-hosted
+          ```
+          EOF
+
+      - name: Upload ISO (or build note)
         uses: actions/upload-artifact@v4
         with:
           name: coraos-iso
-          path: /tmp/coraos-iso/*.iso
+          path: ${{ github.workspace }}/iso-output/
           retention-days: 3
           if-no-files-found: warn
 
@@ -206,7 +302,7 @@ jobs:
             grep -c '^\[' "$f" > /dev/null && echo "    Has sections: OK"
           done
 
-      - name: Verify meson.build references
+      - name: Verify source files exist
         run: |
           echo "Checking all source files referenced in meson.build exist..."
           for src in src/shell/main.c src/shell/cora-shell.c src/shell/cora-panel.c \
