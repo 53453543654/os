@@ -9,13 +9,16 @@ on:
     branches: [main]
   workflow_dispatch:
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   # === Job 1: Compile all C applications ===
   build:
     name: Build CoraOS Components
     runs-on: ubuntu-latest
     container:
-      image: fedora:39
+      image: fedora:41
 
     steps:
       - name: Checkout source
@@ -23,12 +26,12 @@ jobs:
 
       - name: Install build dependencies
         run: |
-          dnf install -y \
+          dnf install -y --setopt=install_weak_deps=False \
             meson ninja-build gcc gcc-c++ pkg-config \
             gtk4-devel libadwaita-devel glib2-devel \
             json-glib-devel cairo-devel pango-devel \
             NetworkManager-libnm-devel \
-            webkit2gtk6.0-devel \
+            webkitgtk6.0-devel \
             desktop-file-utils \
             git
 
@@ -59,7 +62,7 @@ jobs:
     name: Build RPM Packages
     runs-on: ubuntu-latest
     container:
-      image: fedora:39
+      image: fedora:41
     needs: build
 
     steps:
@@ -68,13 +71,13 @@ jobs:
 
       - name: Install RPM build tools
         run: |
-          dnf install -y \
+          dnf install -y --setopt=install_weak_deps=False \
             rpm-build rpmdevtools \
             meson ninja-build gcc gcc-c++ pkg-config \
             gtk4-devel libadwaita-devel glib2-devel \
             json-glib-devel cairo-devel pango-devel \
             NetworkManager-libnm-devel \
-            webkit2gtk6.0-devel \
+            webkitgtk6.0-devel \
             desktop-file-utils
 
       - name: Setup RPM build tree
@@ -103,7 +106,7 @@ jobs:
     name: Build Live ISO
     runs-on: ubuntu-latest
     container:
-      image: fedora:39
+      image: fedora:41
       options: --privileged
     needs: build
 
@@ -113,13 +116,13 @@ jobs:
 
       - name: Install ISO build tools
         run: |
-          dnf install -y \
-            lorax livecd-tools anaconda \
+          dnf install -y --setopt=install_weak_deps=False \
+            lorax livecd-tools \
             meson ninja-build gcc gcc-c++ pkg-config \
             gtk4-devel libadwaita-devel glib2-devel \
             json-glib-devel cairo-devel pango-devel \
             NetworkManager-libnm-devel \
-            webkit2gtk6.0-devel \
+            webkitgtk6.0-devel \
             desktop-file-utils \
             squashfs-tools \
             grub2-efi-x64 shim-x64 \
@@ -141,8 +144,8 @@ jobs:
             --volid="CoraOS-1-0" \
             --iso-only \
             --iso-name=CoraOS-1.0-Ember-x86_64.iso \
-            --releasever=39 \
-            --macboot || echo "ISO build requires full privileges - see README for local build"
+            --releasever=41 \
+            --macboot || echo "::warning::ISO build requires full privileges - see README for local build"
 
       - name: Upload ISO
         uses: actions/upload-artifact@v4
@@ -161,16 +164,32 @@ jobs:
       - name: Checkout source
         uses: actions/checkout@v4
 
+      - name: Install validation tools
+        run: sudo apt-get update && sudo apt-get install -y libxml2-utils
+
       - name: Validate SVG files
         run: |
           echo "Checking SVG files are well-formed XML..."
-          find . -name "*.svg" -exec xmllint --noout {} \; 2>&1 | head -50
-        continue-on-error: true
+          errors=0
+          for svg in $(find . -name "*.svg" -not -path './.git/*'); do
+            if xmllint --noout "$svg" 2>/dev/null; then
+              echo "  OK: $svg"
+            else
+              echo "  FAIL: $svg"
+              errors=$((errors + 1))
+            fi
+          done
+          if [ $errors -gt 0 ]; then
+            echo "::warning::$errors SVG file(s) have XML issues"
+          else
+            echo "All SVG files valid!"
+          fi
 
       - name: Validate GSettings schema
         run: |
           echo "Checking GSettings schema..."
           xmllint --noout data/glib-2.0/schemas/*.xml
+          echo "GSettings schema valid!"
 
       - name: Check session files
         run: |

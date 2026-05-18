@@ -37,7 +37,10 @@ cairo_dep = dependency('cairo', required: true)
 
 # Optional dependencies
 nm_dep = dependency('libnm', version: '>= 1.40', required: false)
-webkit_dep = dependency('webkit2gtk-5.0', required: false)
+webkit_dep = dependency('webkitgtk-6.0', required: false)
+if not webkit_dep.found()
+    webkit_dep = dependency('webkit2gtk-5.0', required: false)
+endif
 
 # === Build Components ===
 
