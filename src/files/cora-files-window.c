@@ -364,6 +364,45 @@ on_file_activated (CoraFilesWindow *self, guint position)
 }
 
 static void
+on_new_folder_dialog_response (AdwMessageDialog *dlg, const char *response, gpointer data)
+{
+    CoraFilesWindow *self = CORA_FILES_WINDOW (data);
+    if (g_strcmp0 (response, "create") == 0) {
+        GtkWidget *entry = g_object_get_data (G_OBJECT (dlg), "entry");
+        const char *name = gtk_editable_get_text (GTK_EDITABLE (entry));
+
+        if (name && name[0] != '\0' && self->current_dir) {
+            g_autoptr(GFile) new_dir = g_file_get_child (self->current_dir, name);
+            g_autoptr(GError) error = NULL;
+
+            if (!g_file_make_directory (new_dir, NULL, &error)) {
+                g_warning ("Failed to create folder: %s", error->message);
+            } else {
+                /* Reload directory */
+                load_directory (self, self->current_dir);
+            }
+        }
+    }
+    gtk_window_destroy (GTK_WINDOW (dlg));
+}
+
+static void
+on_delete_file_dialog_response (AdwMessageDialog *dlg, const char *response, gpointer data)
+{
+    CoraFilesWindow *self = CORA_FILES_WINDOW (data);
+    if (g_strcmp0 (response, "trash") == 0) {
+        GFile *file = g_object_get_data (G_OBJECT (dlg), "file");
+        g_autoptr(GError) error = NULL;
+
+        if (!g_file_trash (file, NULL, &error))
+            g_warning ("Trash failed: %s", error->message);
+        else
+            load_directory (self, self->current_dir);
+    }
+    gtk_window_destroy (GTK_WINDOW (dlg));
+}
+
+static void
 on_new_folder_clicked (GtkButton *btn, gpointer user_data)
 {
     CoraFilesWindow *self = CORA_FILES_WINDOW (user_data);
@@ -386,27 +425,7 @@ on_new_folder_clicked (GtkButton *btn, gpointer user_data)
 
     g_object_set_data (G_OBJECT (dialog), "entry", entry);
 
-    g_signal_connect (dialog, "response", G_CALLBACK (
-        +[](AdwMessageDialog *dlg, const char *response, gpointer data) {
-            CoraFilesWindow *self = CORA_FILES_WINDOW (data);
-            if (g_strcmp0 (response, "create") == 0) {
-                GtkWidget *entry = g_object_get_data (G_OBJECT (dlg), "entry");
-                const char *name = gtk_editable_get_text (GTK_EDITABLE (entry));
-
-                if (name && name[0] != '\0' && self->current_dir) {
-                    g_autoptr(GFile) new_dir = g_file_get_child (self->current_dir, name);
-                    g_autoptr(GError) error = NULL;
-
-                    if (!g_file_make_directory (new_dir, NULL, &error)) {
-                        g_warning ("Failed to create folder: %s", error->message);
-                    } else {
-                        /* Reload directory */
-                        load_directory (self, self->current_dir);
-                    }
-                }
-            }
-            gtk_window_destroy (GTK_WINDOW (dlg));
-        }), self);
+    g_signal_connect (dialog, "response", G_CALLBACK (on_new_folder_dialog_response), self);
 
     gtk_window_present (GTK_WINDOW (dialog));
 }
@@ -429,25 +448,21 @@ delete_file_action (CoraFilesWindow *self, GFile *file, const char *name)
 
     g_object_set_data_full (G_OBJECT (dialog), "file", g_object_ref (file), g_object_unref);
 
-    g_signal_connect (dialog, "response", G_CALLBACK (
-        +[](AdwMessageDialog *dlg, const char *response, gpointer data) {
-            CoraFilesWindow *self = CORA_FILES_WINDOW (data);
-            if (g_strcmp0 (response, "trash") == 0) {
-                GFile *file = g_object_get_data (G_OBJECT (dlg), "file");
-                g_autoptr(GError) error = NULL;
-
-                if (!g_file_trash (file, NULL, &error))
-                    g_warning ("Trash failed: %s", error->message);
-                else
-                    load_directory (self, self->current_dir);
-            }
-            gtk_window_destroy (GTK_WINDOW (dlg));
-        }), self);
+    g_signal_connect (dialog, "response", G_CALLBACK (on_delete_file_dialog_response), self);
 
     gtk_window_present (GTK_WINDOW (dialog));
 }
 
 /* === Path Bar === */
+
+static void
+on_path_button_clicked (GtkButton *b, gpointer data)
+{
+    CoraFilesWindow *self = CORA_FILES_WINDOW (data);
+    const char *path = g_object_get_data (G_OBJECT (b), "path");
+    g_autoptr(GFile) dir = g_file_new_for_path (path);
+    cora_files_window_navigate (self, dir);
+}
 
 static void
 update_path_bar (CoraFilesWindow *self)
@@ -486,13 +501,7 @@ update_path_bar (CoraFilesWindow *self)
         gtk_widget_add_css_class (btn, "flat");
         g_object_set_data_full (G_OBJECT (btn), "path",
                                 g_strdup (cumulative->str), g_free);
-        g_signal_connect (btn, "clicked", G_CALLBACK (
-            +[](GtkButton *b, gpointer data) {
-                CoraFilesWindow *self = CORA_FILES_WINDOW (data);
-                const char *path = g_object_get_data (G_OBJECT (b), "path");
-                g_autoptr(GFile) dir = g_file_new_for_path (path);
-                cora_files_window_navigate (self, dir);
-            }), self);
+        g_signal_connect (btn, "clicked", G_CALLBACK (on_path_button_clicked), self);
         gtk_box_append (GTK_BOX (self->path_bar), btn);
 
         /* Separator */
@@ -509,6 +518,21 @@ update_path_bar (CoraFilesWindow *self)
 
 
 /* === Sidebar === */
+
+static void
+on_sidebar_row_activated (GtkListBox *box, GtkListBoxRow *row, gpointer data)
+{
+    CoraFilesWindow *self = CORA_FILES_WINDOW (data);
+    const char *target = g_object_get_data (G_OBJECT (row), "target-path");
+    if (target) {
+        g_autoptr(GFile) dir = NULL;
+        if (g_str_has_prefix (target, "trash://"))
+            dir = g_file_new_for_uri (target);
+        else
+            dir = g_file_new_for_path (target);
+        cora_files_window_navigate (self, dir);
+    }
+}
 
 static void
 populate_sidebar (CoraFilesWindow *self)
@@ -549,19 +573,7 @@ populate_sidebar (CoraFilesWindow *self)
     }
 
     /* Handle sidebar clicks */
-    g_signal_connect (list, "row-activated", G_CALLBACK (
-        +[](GtkListBox *box, GtkListBoxRow *row, gpointer data) {
-            CoraFilesWindow *self = CORA_FILES_WINDOW (data);
-            const char *target = g_object_get_data (G_OBJECT (row), "target-path");
-            if (target) {
-                g_autoptr(GFile) dir = NULL;
-                if (g_str_has_prefix (target, "trash://"))
-                    dir = g_file_new_for_uri (target);
-                else
-                    dir = g_file_new_for_path (target);
-                cora_files_window_navigate (self, dir);
-            }
-        }), self);
+    g_signal_connect (list, "row-activated", G_CALLBACK (on_sidebar_row_activated), self);
 }
 
 /* === Grid View Setup === */

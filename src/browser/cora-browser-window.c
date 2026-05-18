@@ -220,7 +220,7 @@ create_tab_with_uri (CoraBrowserWindow *self, const char *uri)
         NULL
     );
 
-    web_view = WEBKIT_WEB_VIEW (webkit_web_view_new_with_context (self->web_context));
+    web_view = WEBKIT_WEB_VIEW (webkit_web_view_new ());
     webkit_web_view_set_settings (web_view, settings);
     g_object_unref (settings);
 
@@ -369,10 +369,12 @@ static void
 on_private_window (GSimpleAction *action, GVariant *param, gpointer user_data)
 {
     CoraBrowserWindow *self = CORA_BROWSER_WINDOW (user_data);
-    /* Create ephemeral web context for private browsing */
-    WebKitWebContext *priv_ctx = webkit_web_context_new_ephemeral ();
-    WebKitWebView *web_view = WEBKIT_WEB_VIEW (
-        webkit_web_view_new_with_context (priv_ctx));
+    /* Create a simple web view for private browsing */
+    WebKitWebView *web_view = WEBKIT_WEB_VIEW (webkit_web_view_new ());
+
+    /* Set an ephemeral network session for private browsing */
+    WebKitNetworkSession *ephemeral_session = webkit_network_session_new_ephemeral ();
+    g_object_set (web_view, "network-session", ephemeral_session, NULL);
 
     AdwTabPage *page = adw_tab_view_append (self->tab_view, GTK_WIDGET (web_view));
     adw_tab_page_set_title (page, "Private Tab");
@@ -381,7 +383,13 @@ on_private_window (GSimpleAction *action, GVariant *param, gpointer user_data)
     adw_tab_view_set_selected_page (self->tab_view, page);
 
     webkit_web_view_load_uri (web_view, self->homepage);
-    g_object_unref (priv_ctx);
+    g_object_unref (ephemeral_session);
+}
+
+static void
+on_private_tab_button_clicked (GtkButton *btn, gpointer data)
+{
+    on_private_window (NULL, NULL, data);
 }
 
 static GtkWidget *
@@ -418,10 +426,8 @@ create_menu_popover (CoraBrowserWindow *self)
             g_signal_connect (btn, "clicked",
                               G_CALLBACK (items[i].cb), self);
         } else if (g_strcmp0 (items[i].label, "Private Tab") == 0) {
-            g_signal_connect_swapped (btn, "clicked", G_CALLBACK (
-                +[](GtkButton *b, gpointer data) {
-                    on_private_window (NULL, NULL, data);
-                }), self);
+            g_signal_connect (btn, "clicked",
+                              G_CALLBACK (on_private_tab_button_clicked), self);
         }
 
         gtk_box_append (GTK_BOX (box), btn);
@@ -548,35 +554,13 @@ cora_browser_window_new (GtkApplication *app, const char *initial_uri)
                                             "application", app,
                                             NULL);
 
-    /* Create persistent web context with cookie/cache storage */
-    g_autofree char *data_dir = g_build_filename (
-        g_get_user_data_dir (), "coraos-browser", NULL);
-    g_autofree char *cache_dir = g_build_filename (
-        g_get_user_cache_dir (), "coraos-browser", NULL);
-
-    WebKitWebsiteDataManager *data_mgr = webkit_website_data_manager_new (
-        "base-data-directory", data_dir,
-        "base-cache-directory", cache_dir,
-        NULL
-    );
-
-    self->web_context = webkit_web_context_new_with_website_data_manager (data_mgr);
-    g_object_unref (data_mgr);
-
-    /* Enable favicons */
-    webkit_web_context_set_favicon_database_directory (self->web_context,
-        g_build_filename (data_dir, "favicons", NULL));
+    /* Use default web context */
+    self->web_context = webkit_web_context_get_default ();
+    g_object_ref (self->web_context);
 
     /* Download handler */
     g_signal_connect (self->web_context, "download-started",
                       G_CALLBACK (on_download_started), self);
-
-    /* Cookie persistence */
-    WebKitCookieManager *cookie_mgr =
-        webkit_web_context_get_cookie_manager (self->web_context);
-    g_autofree char *cookie_file = g_build_filename (data_dir, "cookies.db", NULL);
-    webkit_cookie_manager_set_persistent_storage (cookie_mgr, cookie_file,
-        WEBKIT_COOKIE_PERSISTENT_STORAGE_SQLITE);
 
     cora_browser_window_build_ui (self);
 

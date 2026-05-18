@@ -208,6 +208,131 @@ get_config_bool (CoraSettingsWindow *self, const char *section,
 }
 
 
+/* === Custom wallpaper file chooser callback === */
+
+static void
+on_custom_wallpaper_file_chosen (GObject *src, GAsyncResult *res, gpointer data)
+{
+    CoraSettingsWindow *self = CORA_SETTINGS_WINDOW (data);
+    g_autoptr(GError) err = NULL;
+    GFile *file = gtk_file_dialog_open_finish (GTK_FILE_DIALOG (src), res, &err);
+    if (file) {
+        g_autofree char *path = g_file_get_path (file);
+        set_config_string (self, "desktop", "wallpaper", path);
+        g_autoptr(GSettings) bg = g_settings_new ("org.gnome.desktop.background");
+        g_autofree char *uri = g_file_get_uri (file);
+        g_settings_set_string (bg, "picture-uri-dark", uri);
+        g_object_unref (file);
+    }
+}
+
+static void
+on_custom_wallpaper_clicked (GtkButton *btn, gpointer data)
+{
+    CoraSettingsWindow *self = CORA_SETTINGS_WINDOW (data);
+    GtkFileDialog *dlg = gtk_file_dialog_new ();
+    GtkFileFilter *filter = gtk_file_filter_new ();
+    gtk_file_filter_add_mime_type (filter, "image/*");
+    gtk_file_filter_set_name (filter, "Images");
+
+    GListStore *filters = g_list_store_new (GTK_TYPE_FILE_FILTER);
+    g_list_store_append (filters, filter);
+    gtk_file_dialog_set_filters (dlg, G_LIST_MODEL (filters));
+
+    gtk_file_dialog_open (dlg, GTK_WINDOW (self), NULL,
+        (GAsyncReadyCallback) on_custom_wallpaper_file_chosen, self);
+    g_object_unref (filters);
+    g_object_unref (filter);
+    g_object_unref (dlg);
+}
+
+/* === Display page callbacks === */
+
+static void
+on_night_light_toggled (GObject *obj, GParamSpec *p, gpointer data)
+{
+    gboolean active = adw_switch_row_get_active (ADW_SWITCH_ROW (obj));
+    g_autoptr(GSettings) s = g_settings_new ("org.gnome.settings-daemon.plugins.color");
+    g_settings_set_boolean (s, "night-light-enabled", active);
+}
+
+static void
+on_night_temp_changed (GtkRange *range, gpointer data)
+{
+    int temp = (int) gtk_range_get_value (range);
+    g_autoptr(GSettings) s = g_settings_new ("org.gnome.settings-daemon.plugins.color");
+    g_settings_set_uint (s, "night-light-temperature", temp);
+}
+
+/* === Sound page callbacks === */
+
+static void
+on_output_volume_changed (GtkRange *range, gpointer data)
+{
+    int vol = (int) gtk_range_get_value (range);
+    g_autofree char *cmd = g_strdup_printf (
+        "pactl set-sink-volume @DEFAULT_SINK@ %d%%", vol);
+    g_spawn_command_line_async (cmd, NULL);
+}
+
+static void
+on_input_volume_changed (GtkRange *range, gpointer data)
+{
+    int vol = (int) gtk_range_get_value (range);
+    g_autofree char *cmd = g_strdup_printf (
+        "pactl set-source-volume @DEFAULT_SOURCE@ %d%%", vol);
+    g_spawn_command_line_async (cmd, NULL);
+}
+
+/* === Network page callbacks === */
+
+static void
+on_wifi_button_clicked (GtkButton *b, gpointer data)
+{
+    g_spawn_command_line_async ("coraos-wifi", NULL);
+}
+
+static void
+on_hostname_apply (AdwEntryRow *row, gpointer data)
+{
+    const char *name = gtk_editable_get_text (GTK_EDITABLE (row));
+    g_autofree char *cmd = g_strdup_printf ("hostnamectl set-hostname '%s'", name);
+    g_spawn_command_line_async (cmd, NULL);
+}
+
+/* === Bluetooth page callbacks === */
+
+static void
+on_bluetooth_toggled (GObject *obj, GParamSpec *p, gpointer data)
+{
+    gboolean active = adw_switch_row_get_active (ADW_SWITCH_ROW (obj));
+    const char *cmd = active ? "bluetoothctl power on" : "bluetoothctl power off";
+    g_spawn_command_line_async (cmd, NULL);
+}
+
+/* === Power page callbacks === */
+
+static void
+on_power_profile_changed (GObject *obj, GParamSpec *p, gpointer data)
+{
+    guint sel = adw_combo_row_get_selected (ADW_COMBO_ROW (obj));
+    const char *profiles[] = {"power-saver", "balanced", "performance"};
+    if (sel < 3) {
+        g_autofree char *cmd = g_strdup_printf (
+            "powerprofilesctl set %s", profiles[sel]);
+        g_spawn_command_line_async (cmd, NULL);
+    }
+}
+
+static void
+on_screen_timeout_changed (GtkRange *range, gpointer data)
+{
+    int secs = (int) gtk_range_get_value (range);
+    g_autoptr(GSettings) s = g_settings_new ("org.gnome.desktop.session");
+    g_settings_set_uint (s, "idle-delay", secs);
+}
+
+
 /* === Appearance Page === */
 
 static void
@@ -458,36 +583,7 @@ create_appearance_page (CoraSettingsWindow *self)
     /* Custom wallpaper button */
     GtkWidget *custom_btn = gtk_button_new_with_label ("Choose Custom Image...");
     gtk_widget_add_css_class (custom_btn, "suggested-action");
-    g_signal_connect (custom_btn, "clicked", G_CALLBACK (
-        +[](GtkButton *btn, gpointer data) {
-            CoraSettingsWindow *self = CORA_SETTINGS_WINDOW (data);
-            GtkFileDialog *dlg = gtk_file_dialog_new ();
-            GtkFileFilter *filter = gtk_file_filter_new ();
-            gtk_file_filter_add_mime_type (filter, "image/*");
-            gtk_file_filter_set_name (filter, "Images");
-
-            GListStore *filters = g_list_store_new (GTK_TYPE_FILE_FILTER);
-            g_list_store_append (filters, filter);
-            gtk_file_dialog_set_filters (dlg, G_LIST_MODEL (filters));
-
-            gtk_file_dialog_open (dlg, GTK_WINDOW (self), NULL,
-                (GAsyncReadyCallback)+[](GObject *src, GAsyncResult *res, gpointer d) {
-                    CoraSettingsWindow *s = CORA_SETTINGS_WINDOW (d);
-                    g_autoptr(GError) err = NULL;
-                    GFile *file = gtk_file_dialog_open_finish (GTK_FILE_DIALOG (src), res, &err);
-                    if (file) {
-                        g_autofree char *path = g_file_get_path (file);
-                        set_config_string (s, "desktop", "wallpaper", path);
-                        g_autoptr(GSettings) bg = g_settings_new ("org.gnome.desktop.background");
-                        g_autofree char *uri = g_file_get_uri (file);
-                        g_settings_set_string (bg, "picture-uri-dark", uri);
-                        g_object_unref (file);
-                    }
-                }, self);
-            g_object_unref (filters);
-            g_object_unref (filter);
-            g_object_unref (dlg);
-        }), self);
+    g_signal_connect (custom_btn, "clicked", G_CALLBACK (on_custom_wallpaper_clicked), self);
     adw_preferences_group_add (ADW_PREFERENCES_GROUP (group), custom_btn);
 
     adw_preferences_page_add (ADW_PREFERENCES_PAGE (page), ADW_PREFERENCES_GROUP (group));
@@ -549,13 +645,7 @@ create_display_page (CoraSettingsWindow *self)
                                    "Night Light");
     adw_action_row_set_subtitle (ADW_ACTION_ROW (self->night_light_switch),
                                  "Reduce blue light to ease eye strain at night");
-    g_signal_connect (self->night_light_switch, "notify::active", G_CALLBACK (
-        +[](GObject *obj, GParamSpec *p, gpointer data) {
-            CoraSettingsWindow *self = CORA_SETTINGS_WINDOW (data);
-            gboolean active = adw_switch_row_get_active (ADW_SWITCH_ROW (obj));
-            g_autoptr(GSettings) s = g_settings_new ("org.gnome.settings-daemon.plugins.color");
-            g_settings_set_boolean (s, "night-light-enabled", active);
-        }), self);
+    g_signal_connect (self->night_light_switch, "notify::active", G_CALLBACK (on_night_light_toggled), self);
     adw_preferences_group_add (ADW_PREFERENCES_GROUP (group), self->night_light_switch);
 
     /* Temperature */
@@ -566,12 +656,7 @@ create_display_page (CoraSettingsWindow *self)
     gtk_range_set_value (GTK_RANGE (self->night_temp_scale), 3500);
     gtk_widget_set_size_request (self->night_temp_scale, 200, -1);
     gtk_widget_set_valign (self->night_temp_scale, GTK_ALIGN_CENTER);
-    g_signal_connect (self->night_temp_scale, "value-changed", G_CALLBACK (
-        +[](GtkRange *range, gpointer data) {
-            int temp = (int) gtk_range_get_value (range);
-            g_autoptr(GSettings) s = g_settings_new ("org.gnome.settings-daemon.plugins.color");
-            g_settings_set_uint (s, "night-light-temperature", temp);
-        }), self);
+    g_signal_connect (self->night_temp_scale, "value-changed", G_CALLBACK (on_night_temp_changed), self);
     adw_action_row_add_suffix (ADW_ACTION_ROW (temp_row), self->night_temp_scale);
     adw_preferences_group_add (ADW_PREFERENCES_GROUP (group), temp_row);
 
@@ -603,13 +688,7 @@ create_sound_page (CoraSettingsWindow *self)
     gtk_range_set_value (GTK_RANGE (self->output_volume_scale), 70);
     gtk_widget_set_size_request (self->output_volume_scale, 250, -1);
     gtk_widget_set_valign (self->output_volume_scale, GTK_ALIGN_CENTER);
-    g_signal_connect (self->output_volume_scale, "value-changed", G_CALLBACK (
-        +[](GtkRange *range, gpointer data) {
-            int vol = (int) gtk_range_get_value (range);
-            g_autofree char *cmd = g_strdup_printf (
-                "pactl set-sink-volume @DEFAULT_SINK@ %d%%", vol);
-            g_spawn_command_line_async (cmd, NULL);
-        }), self);
+    g_signal_connect (self->output_volume_scale, "value-changed", G_CALLBACK (on_output_volume_changed), self);
     adw_action_row_add_suffix (ADW_ACTION_ROW (vol_row), self->output_volume_scale);
     adw_preferences_group_add (ADW_PREFERENCES_GROUP (group), vol_row);
 
@@ -634,13 +713,7 @@ create_sound_page (CoraSettingsWindow *self)
     gtk_range_set_value (GTK_RANGE (self->input_volume_scale), 80);
     gtk_widget_set_size_request (self->input_volume_scale, 250, -1);
     gtk_widget_set_valign (self->input_volume_scale, GTK_ALIGN_CENTER);
-    g_signal_connect (self->input_volume_scale, "value-changed", G_CALLBACK (
-        +[](GtkRange *range, gpointer data) {
-            int vol = (int) gtk_range_get_value (range);
-            g_autofree char *cmd = g_strdup_printf (
-                "pactl set-source-volume @DEFAULT_SOURCE@ %d%%", vol);
-            g_spawn_command_line_async (cmd, NULL);
-        }), self);
+    g_signal_connect (self->input_volume_scale, "value-changed", G_CALLBACK (on_input_volume_changed), self);
     adw_action_row_add_suffix (ADW_ACTION_ROW (mic_row), self->input_volume_scale);
     adw_preferences_group_add (ADW_PREFERENCES_GROUP (group), mic_row);
 
@@ -673,10 +746,7 @@ create_network_page (CoraSettingsWindow *self)
 
     GtkWidget *wifi_btn = gtk_button_new_from_icon_name ("go-next-symbolic");
     gtk_widget_set_valign (wifi_btn, GTK_ALIGN_CENTER);
-    g_signal_connect (wifi_btn, "clicked", G_CALLBACK (
-        +[](GtkButton *b, gpointer d) {
-            g_spawn_command_line_async ("coraos-wifi", NULL);
-        }), NULL);
+    g_signal_connect (wifi_btn, "clicked", G_CALLBACK (on_wifi_button_clicked), NULL);
     adw_action_row_add_suffix (ADW_ACTION_ROW (wifi_row), wifi_btn);
     adw_action_row_set_activatable_widget (ADW_ACTION_ROW (wifi_row), wifi_btn);
     adw_preferences_group_add (ADW_PREFERENCES_GROUP (group), wifi_row);
@@ -692,12 +762,7 @@ create_network_page (CoraSettingsWindow *self)
     g_autofree char *hostname = g_malloc (256);
     gethostname (hostname, 256);
     gtk_editable_set_text (GTK_EDITABLE (host_row), hostname);
-    g_signal_connect (host_row, "apply", G_CALLBACK (
-        +[](AdwEntryRow *row, gpointer data) {
-            const char *name = gtk_editable_get_text (GTK_EDITABLE (row));
-            g_autofree char *cmd = g_strdup_printf ("hostnamectl set-hostname '%s'", name);
-            g_spawn_command_line_async (cmd, NULL);
-        }), NULL);
+    g_signal_connect (host_row, "apply", G_CALLBACK (on_hostname_apply), NULL);
     adw_preferences_group_add (ADW_PREFERENCES_GROUP (group), host_row);
 
     adw_preferences_page_add (ADW_PREFERENCES_PAGE (page), ADW_PREFERENCES_GROUP (group));
@@ -724,12 +789,7 @@ create_bluetooth_page (CoraSettingsWindow *self)
     adw_preferences_row_set_title (ADW_PREFERENCES_ROW (bt_switch), "Bluetooth");
     adw_action_row_set_subtitle (ADW_ACTION_ROW (bt_switch),
                                  "Enable Bluetooth radio");
-    g_signal_connect (bt_switch, "notify::active", G_CALLBACK (
-        +[](GObject *obj, GParamSpec *p, gpointer data) {
-            gboolean active = adw_switch_row_get_active (ADW_SWITCH_ROW (obj));
-            const char *cmd = active ? "bluetoothctl power on" : "bluetoothctl power off";
-            g_spawn_command_line_async (cmd, NULL);
-        }), NULL);
+    g_signal_connect (bt_switch, "notify::active", G_CALLBACK (on_bluetooth_toggled), NULL);
     adw_preferences_group_add (ADW_PREFERENCES_GROUP (group), bt_switch);
 
     GtkWidget *disc_row = adw_action_row_new ();
@@ -773,16 +833,7 @@ create_power_page (CoraSettingsWindow *self)
     adw_combo_row_set_model (ADW_COMBO_ROW (self->power_profile_combo),
                              G_LIST_MODEL (profiles));
     adw_combo_row_set_selected (ADW_COMBO_ROW (self->power_profile_combo), 1);
-    g_signal_connect (self->power_profile_combo, "notify::selected", G_CALLBACK (
-        +[](GObject *obj, GParamSpec *p, gpointer data) {
-            guint sel = adw_combo_row_get_selected (ADW_COMBO_ROW (obj));
-            const char *profiles[] = {"power-saver", "balanced", "performance"};
-            if (sel < 3) {
-                g_autofree char *cmd = g_strdup_printf (
-                    "powerprofilesctl set %s", profiles[sel]);
-                g_spawn_command_line_async (cmd, NULL);
-            }
-        }), NULL);
+    g_signal_connect (self->power_profile_combo, "notify::selected", G_CALLBACK (on_power_profile_changed), NULL);
     adw_preferences_group_add (ADW_PREFERENCES_GROUP (group), self->power_profile_combo);
 
     adw_preferences_page_add (ADW_PREFERENCES_PAGE (page), ADW_PREFERENCES_GROUP (group));
@@ -800,12 +851,7 @@ create_power_page (CoraSettingsWindow *self)
     gtk_widget_set_valign (self->screen_timeout_scale, GTK_ALIGN_CENTER);
     gtk_scale_add_mark (GTK_SCALE (self->screen_timeout_scale), 300, GTK_POS_BOTTOM, "5m");
     gtk_scale_add_mark (GTK_SCALE (self->screen_timeout_scale), 900, GTK_POS_BOTTOM, "15m");
-    g_signal_connect (self->screen_timeout_scale, "value-changed", G_CALLBACK (
-        +[](GtkRange *range, gpointer data) {
-            int secs = (int) gtk_range_get_value (range);
-            g_autoptr(GSettings) s = g_settings_new ("org.gnome.desktop.session");
-            g_settings_set_uint (s, "idle-delay", secs);
-        }), NULL);
+    g_signal_connect (self->screen_timeout_scale, "value-changed", G_CALLBACK (on_screen_timeout_changed), NULL);
     adw_action_row_add_suffix (ADW_ACTION_ROW (screen_row), self->screen_timeout_scale);
     adw_preferences_group_add (ADW_PREFERENCES_GROUP (group), screen_row);
 
