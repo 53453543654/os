@@ -17,7 +17,7 @@
  */
 
 #include <gtk/gtk.h>
-#include <libadwaita-1/adw.h>
+#include <adwaita.h>
 
 #include "cora-settings-window.h"
 
@@ -40,7 +40,7 @@ main (int argc, char *argv[])
     g_autoptr(AdwApplication) app = NULL;
     int status;
 
-    app = adw_application_new ("dev.coraos.Settings", G_APPLICATION_FLAGS_NONE);
+    app = adw_application_new ("dev.coraos.Settings", G_APPLICATION_DEFAULT_FLAGS);
     g_signal_connect (app, "activate", G_CALLBACK (on_activate), NULL);
 
     status = g_application_run (G_APPLICATION (app), argc, argv);

@@ -247,6 +247,6 @@ cora_shell_new (void)
 {
     return g_object_new (CORA_TYPE_SHELL,
                          "application-id", "dev.coraos.Shell",
-                         "flags", G_APPLICATION_FLAGS_NONE,
+                         "flags", G_APPLICATION_DEFAULT_FLAGS,
                          NULL);
 }

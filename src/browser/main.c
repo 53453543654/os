@@ -15,7 +15,7 @@
  */
 
 #include <gtk/gtk.h>
-#include <libadwaita-1/adw.h>
+#include <adwaita.h>
 
 #include "cora-browser-window.h"
 

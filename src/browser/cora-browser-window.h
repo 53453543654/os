@@ -6,7 +6,7 @@
 #pragma once
 
 #include <gtk/gtk.h>
-#include <libadwaita-1/adw.h>
+#include <adwaita.h>
 #include <webkit/webkit.h>
 
 G_BEGIN_DECLS

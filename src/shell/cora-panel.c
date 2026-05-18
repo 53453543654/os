@@ -14,7 +14,7 @@
 #include "cora-shell.h"
 
 #include <time.h>
-#include <upower.h>
+/* UPower integration would go here - removed to avoid build dep */
 
 struct _CoraPanel {
     GtkApplicationWindow parent_instance;

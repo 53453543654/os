@@ -12,6 +12,7 @@
  */
 
 #include "cora-launcher.h"
+#include <gio/gio.h>
 #include <gio/gdesktopappinfo.h>
 
 #define GRID_COLUMNS 6
