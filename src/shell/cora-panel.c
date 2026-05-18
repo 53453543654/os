@@ -83,6 +83,15 @@ on_wifi_clicked (GtkButton *button, gpointer user_data)
 }
 
 static void
+on_power_command_clicked (GtkButton *b, gpointer d)
+{
+    const char *cmd = (const char *)g_object_get_data (G_OBJECT (b), "cmd");
+    g_autoptr(GError) err = NULL;
+    if (!g_spawn_command_line_async (cmd, &err))
+        g_warning ("Power command failed: %s", err->message);
+}
+
+static void
 on_power_clicked (GtkButton *button, gpointer user_data)
 {
     /* Show power menu (shutdown, restart, logout, suspend) */
@@ -109,19 +118,29 @@ on_power_clicked (GtkButton *button, gpointer user_data)
         gtk_widget_add_css_class (btn, "cora-panel-button");
         gtk_widget_set_hexpand (btn, TRUE);
         g_object_set_data_full (G_OBJECT (btn), "cmd", g_strdup (commands[i]), g_free);
-        g_signal_connect (btn, "clicked", G_CALLBACK (
-            +[](GtkButton *b, gpointer d) {
-                const char *cmd = (const char *)g_object_get_data (G_OBJECT (b), "cmd");
-                g_autoptr(GError) err = NULL;
-                if (!g_spawn_command_line_async (cmd, &err))
-                    g_warning ("Power command failed: %s", err->message);
-            }), NULL);
+        g_signal_connect (btn, "clicked", G_CALLBACK (on_power_command_clicked), NULL);
         gtk_box_append (GTK_BOX (box), btn);
     }
 
     gtk_popover_set_child (GTK_POPOVER (popover), box);
     gtk_widget_set_parent (popover, GTK_WIDGET (button));
     gtk_popover_popup (GTK_POPOVER (popover));
+}
+
+static void
+on_volume_scale_changed (GtkRange *range, gpointer d)
+{
+    int vol = (int) gtk_range_get_value (range);
+    g_autofree char *cmd = g_strdup_printf (
+        "pactl set-sink-volume @DEFAULT_SINK@ %d%%", vol);
+    g_spawn_command_line_async (cmd, NULL);
+}
+
+static void
+on_mute_toggled (GtkButton *b, gpointer d)
+{
+    g_spawn_command_line_async (
+        "pactl set-sink-mute @DEFAULT_SINK@ toggle", NULL);
 }
 
 static void
@@ -142,23 +161,13 @@ on_volume_clicked (GtkButton *button, gpointer user_data)
     GtkWidget *scale = gtk_scale_new_with_range (GTK_ORIENTATION_HORIZONTAL, 0, 100, 1);
     gtk_range_set_value (GTK_RANGE (scale), 70);
     gtk_widget_set_size_request (scale, 200, -1);
-    g_signal_connect (scale, "value-changed", G_CALLBACK (
-        +[](GtkRange *range, gpointer d) {
-            int vol = (int) gtk_range_get_value (range);
-            g_autofree char *cmd = g_strdup_printf (
-                "pactl set-sink-volume @DEFAULT_SINK@ %d%%", vol);
-            g_spawn_command_line_async (cmd, NULL);
-        }), NULL);
+    g_signal_connect (scale, "value-changed", G_CALLBACK (on_volume_scale_changed), NULL);
     gtk_box_append (GTK_BOX (box), scale);
 
     /* Mute toggle */
     GtkWidget *mute_btn = gtk_button_new_with_label ("Mute");
     gtk_widget_add_css_class (mute_btn, "cora-panel-button");
-    g_signal_connect (mute_btn, "clicked", G_CALLBACK (
-        +[](GtkButton *b, gpointer d) {
-            g_spawn_command_line_async (
-                "pactl set-sink-mute @DEFAULT_SINK@ toggle", NULL);
-        }), NULL);
+    g_signal_connect (mute_btn, "clicked", G_CALLBACK (on_mute_toggled), NULL);
     gtk_box_append (GTK_BOX (box), mute_btn);
 
     gtk_popover_set_child (GTK_POPOVER (popover), box);

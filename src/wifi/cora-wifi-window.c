@@ -81,10 +81,18 @@ signal_icon_name (guint8 strength)
 
 /* === Network List === */
 
+static void
+on_connect_btn_clicked (GtkButton *btn, gpointer data)
+{
+    CoraWifiWindow *self = CORA_WIFI_WINDOW (data);
+    NMAccessPoint *ap = g_object_get_data (G_OBJECT (btn), "ap");
+    connect_to_ap (self, ap);
+}
+
 static GtkWidget *
 create_network_row (CoraWifiWindow *self, NMAccessPoint *ap)
 {
-    GtkWidget *row, *box, *icon, *label_box, *name_label, *info_label, *connect_btn;
+    GtkWidget *row, *icon, *connect_btn;
     GBytes *ssid_bytes;
     g_autofree char *ssid = NULL;
     guint8 strength;
@@ -120,12 +128,8 @@ create_network_row (CoraWifiWindow *self, NMAccessPoint *ap)
     gtk_widget_set_valign (connect_btn, GTK_ALIGN_CENTER);
     g_object_set_data_full (G_OBJECT (connect_btn), "ap",
                             g_object_ref (ap), g_object_unref);
-    g_signal_connect_swapped (connect_btn, "clicked",
-                              G_CALLBACK (+[](GtkButton *btn, gpointer data) {
-                                  CoraWifiWindow *self = CORA_WIFI_WINDOW (data);
-                                  NMAccessPoint *ap = g_object_get_data (G_OBJECT (btn), "ap");
-                                  connect_to_ap (self, ap);
-                              }), self);
+    g_signal_connect (connect_btn, "clicked",
+                      G_CALLBACK (on_connect_btn_clicked), self);
     adw_action_row_add_suffix (ADW_ACTION_ROW (row), connect_btn);
 
     /* Check if already connected */
@@ -284,9 +288,55 @@ connect_to_ap (CoraWifiWindow *self, NMAccessPoint *ap)
 }
 
 static void
+on_password_dialog_response (AdwMessageDialog *dlg, const char *response, gpointer data)
+{
+    CoraWifiWindow *self = CORA_WIFI_WINDOW (data);
+
+    if (g_strcmp0 (response, "connect") == 0) {
+        NMAccessPoint *ap = g_object_get_data (G_OBJECT (dlg), "ap");
+        GtkWidget *entry = g_object_get_data (G_OBJECT (dlg), "entry");
+        const char *password = gtk_editable_get_text (GTK_EDITABLE (entry));
+
+        /* Create connection with WPA password */
+        NMConnection *conn = nm_simple_connection_new ();
+        NMSettingConnection *s_con = (NMSettingConnection *)
+            nm_setting_connection_new ();
+        NMSettingWireless *s_wifi = (NMSettingWireless *)
+            nm_setting_wireless_new ();
+        NMSettingWirelessSecurity *s_sec = (NMSettingWirelessSecurity *)
+            nm_setting_wireless_security_new ();
+
+        g_object_set (s_con,
+            NM_SETTING_CONNECTION_TYPE, NM_SETTING_WIRELESS_SETTING_NAME,
+            NM_SETTING_CONNECTION_AUTOCONNECT, TRUE,
+            NULL);
+        g_object_set (s_wifi,
+            NM_SETTING_WIRELESS_SSID, nm_access_point_get_ssid (ap),
+            NULL);
+        g_object_set (s_sec,
+            NM_SETTING_WIRELESS_SECURITY_KEY_MGMT, "wpa-psk",
+            NM_SETTING_WIRELESS_SECURITY_PSK, password,
+            NULL);
+
+        nm_connection_add_setting (conn, NM_SETTING (s_con));
+        nm_connection_add_setting (conn, NM_SETTING (s_wifi));
+        nm_connection_add_setting (conn, NM_SETTING (s_sec));
+
+        nm_client_add_and_activate_connection_async (
+            self->nm_client, conn,
+            NM_DEVICE (self->wifi_device), NULL,
+            NULL, on_connection_added, self);
+
+        g_object_unref (conn);
+    }
+
+    gtk_window_destroy (GTK_WINDOW (dlg));
+}
+
+static void
 show_password_dialog (CoraWifiWindow *self, NMAccessPoint *ap)
 {
-    GtkWidget *dialog, *content, *entry, *box, *label;
+    GtkWidget *dialog, *entry, *box;
     GBytes *ssid_bytes = nm_access_point_get_ssid (ap);
     g_autofree char *ssid = nm_utils_ssid_to_utf8 (
         g_bytes_get_data (ssid_bytes, NULL),
@@ -322,50 +372,7 @@ show_password_dialog (CoraWifiWindow *self, NMAccessPoint *ap)
     g_object_set_data_full (G_OBJECT (dialog), "ap", g_object_ref (ap), g_object_unref);
     g_object_set_data (G_OBJECT (dialog), "entry", entry);
 
-    g_signal_connect (dialog, "response", G_CALLBACK (
-        +[](AdwMessageDialog *dlg, const char *response, gpointer data) {
-            CoraWifiWindow *self = CORA_WIFI_WINDOW (data);
-
-            if (g_strcmp0 (response, "connect") == 0) {
-                NMAccessPoint *ap = g_object_get_data (G_OBJECT (dlg), "ap");
-                GtkWidget *entry = g_object_get_data (G_OBJECT (dlg), "entry");
-                const char *password = gtk_editable_get_text (GTK_EDITABLE (entry));
-
-                /* Create connection with WPA password */
-                NMConnection *conn = nm_simple_connection_new ();
-                NMSettingConnection *s_con = (NMSettingConnection *)
-                    nm_setting_connection_new ();
-                NMSettingWireless *s_wifi = (NMSettingWireless *)
-                    nm_setting_wireless_new ();
-                NMSettingWirelessSecurity *s_sec = (NMSettingWirelessSecurity *)
-                    nm_setting_wireless_security_new ();
-
-                g_object_set (s_con,
-                    NM_SETTING_CONNECTION_TYPE, NM_SETTING_WIRELESS_SETTING_NAME,
-                    NM_SETTING_CONNECTION_AUTOCONNECT, TRUE,
-                    NULL);
-                g_object_set (s_wifi,
-                    NM_SETTING_WIRELESS_SSID, nm_access_point_get_ssid (ap),
-                    NULL);
-                g_object_set (s_sec,
-                    NM_SETTING_WIRELESS_SECURITY_KEY_MGMT, "wpa-psk",
-                    NM_SETTING_WIRELESS_SECURITY_PSK, password,
-                    NULL);
-
-                nm_connection_add_setting (conn, NM_SETTING (s_con));
-                nm_connection_add_setting (conn, NM_SETTING (s_wifi));
-                nm_connection_add_setting (conn, NM_SETTING (s_sec));
-
-                nm_client_add_and_activate_connection_async (
-                    self->nm_client, conn,
-                    NM_DEVICE (self->wifi_device), NULL,
-                    NULL, on_connection_added, self);
-
-                g_object_unref (conn);
-            }
-
-            gtk_window_destroy (GTK_WINDOW (dlg));
-        }), self);
+    g_signal_connect (dialog, "response", G_CALLBACK (on_password_dialog_response), self);
 
     gtk_window_present (GTK_WINDOW (dialog));
 }

@@ -205,7 +205,7 @@ on_key_pressed (GtkEventControllerKey *controller,
 static void
 cora_launcher_build_ui (CoraLauncher *self)
 {
-    GtkWidget *key_controller;
+    GtkEventController *key_controller;
 
     gtk_window_set_decorated (GTK_WINDOW (self), FALSE);
     gtk_window_set_modal (GTK_WINDOW (self), TRUE);
@@ -216,7 +216,7 @@ cora_launcher_build_ui (CoraLauncher *self)
     key_controller = gtk_event_controller_key_new ();
     g_signal_connect (key_controller, "key-pressed",
                       G_CALLBACK (on_key_pressed), self);
-    gtk_widget_add_controller (GTK_WIDGET (self), GTK_EVENT_CONTROLLER (key_controller));
+    gtk_widget_add_controller (GTK_WIDGET (self), key_controller);
 
     /* Main vertical layout */
     self->main_box = gtk_box_new (GTK_ORIENTATION_VERTICAL, 16);
