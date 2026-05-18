@@ -1,0 +1,4 @@
+[Unit]
+Description=CoraOS XDG Autostart
+BindsTo=graphical-session.target
+After=coraos-shell.service

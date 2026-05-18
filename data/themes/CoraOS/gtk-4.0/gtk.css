@@ -1,0 +1,372 @@
+/* CoraOS GTK4 Theme - Black & Red
+ * A modern dark theme with vibrant red accents
+ * Copyright (C) 2024 CoraOS Contributors
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+
+/* === Color Definitions === */
+@define-color accent_color #FF1A1A;
+@define-color accent_bg_color #CC0000;
+@define-color accent_fg_color #FFFFFF;
+@define-color destructive_color #FF4444;
+@define-color destructive_bg_color #CC3333;
+@define-color success_color #44CC44;
+@define-color warning_color #FFAA00;
+@define-color error_color #FF4444;
+
+@define-color window_bg_color #0D0D0D;
+@define-color window_fg_color #F0F0F0;
+@define-color view_bg_color #141414;
+@define-color view_fg_color #E8E8E8;
+@define-color headerbar_bg_color #1A1A1A;
+@define-color headerbar_fg_color #F0F0F0;
+@define-color headerbar_border_color rgba(255, 26, 26, 0.3);
+@define-color card_bg_color #1E1E1E;
+@define-color card_fg_color #E8E8E8;
+@define-color popover_bg_color #1A1A1A;
+@define-color popover_fg_color #F0F0F0;
+@define-color sidebar_bg_color #111111;
+@define-color sidebar_fg_color #E0E0E0;
+@define-color borders rgba(255, 255, 255, 0.08);
+
+/* === Global === */
+* {
+    outline-color: alpha(@accent_color, 0.5);
+}
+
+/* === Window === */
+window, window.background {
+    background-color: @window_bg_color;
+    color: @window_fg_color;
+}
+
+/* === Header Bar === */
+headerbar {
+    background-color: @headerbar_bg_color;
+    color: @headerbar_fg_color;
+    border-bottom: 1px solid @headerbar_border_color;
+    min-height: 42px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+headerbar .title {
+    font-weight: 700;
+}
+
+/* === Buttons === */
+button {
+    background-color: #252525;
+    color: @window_fg_color;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 8px;
+    padding: 6px 14px;
+    min-height: 28px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+button:hover {
+    background-color: #303030;
+    border-color: rgba(255, 26, 26, 0.4);
+    box-shadow: 0 2px 6px rgba(255, 26, 26, 0.12);
+}
+
+button:active, button:checked {
+    background-color: #1A1A1A;
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+
+button.suggested-action {
+    background: linear-gradient(180deg, #FF2222 0%, #CC0000 100%);
+    color: #FFFFFF;
+    border: 1px solid rgba(255, 26, 26, 0.6);
+    font-weight: 600;
+    box-shadow: 0 2px 8px rgba(255, 26, 26, 0.25);
+}
+
+button.suggested-action:hover {
+    background: linear-gradient(180deg, #FF4444 0%, #DD1111 100%);
+    box-shadow: 0 4px 12px rgba(255, 26, 26, 0.35);
+}
+
+button.destructive-action {
+    background: linear-gradient(180deg, #FF4444 0%, #CC2222 100%);
+    color: #FFFFFF;
+    border: 1px solid rgba(255, 68, 68, 0.5);
+}
+
+button.flat {
+    background: transparent;
+    border: none;
+    box-shadow: none;
+}
+
+button.flat:hover {
+    background-color: rgba(255, 26, 26, 0.1);
+}
+
+button.circular {
+    border-radius: 50%;
+    padding: 8px;
+    min-width: 34px;
+    min-height: 34px;
+}
+
+/* === Entry === */
+entry {
+    background-color: #181818;
+    color: @view_fg_color;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 8px 12px;
+    min-height: 20px;
+    caret-color: @accent_color;
+}
+
+entry:focus {
+    border-color: @accent_color;
+    box-shadow: 0 0 0 2px rgba(255, 26, 26, 0.2);
+}
+
+/* === Switch === */
+switch {
+    background-color: #333333;
+    border-radius: 14px;
+    min-width: 48px;
+    min-height: 26px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+switch:checked {
+    background: linear-gradient(90deg, #CC0000, #FF1A1A);
+    border-color: rgba(255, 26, 26, 0.5);
+    box-shadow: 0 0 8px rgba(255, 26, 26, 0.3);
+}
+
+switch slider {
+    background-color: #FFFFFF;
+    border-radius: 50%;
+    min-width: 22px;
+    min-height: 22px;
+    margin: 2px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+/* === Scale === */
+scale trough {
+    background-color: #252525;
+    border-radius: 6px;
+    min-height: 6px;
+}
+
+scale highlight {
+    background: linear-gradient(90deg, #CC0000, #FF1A1A);
+    border-radius: 6px;
+    min-height: 6px;
+}
+
+scale slider {
+    background: linear-gradient(180deg, #FF2222, #CC0000);
+    border-radius: 50%;
+    min-width: 18px;
+    min-height: 18px;
+    border: 2px solid rgba(255, 255, 255, 0.12);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+scale slider:hover {
+    background: linear-gradient(180deg, #FF4444, #DD1111);
+    box-shadow: 0 2px 8px rgba(255, 26, 26, 0.4);
+}
+
+/* === Scrollbar === */
+scrollbar slider {
+    background-color: rgba(255, 26, 26, 0.35);
+    border-radius: 10px;
+    min-width: 6px;
+    min-height: 6px;
+}
+
+scrollbar slider:hover {
+    background-color: rgba(255, 26, 26, 0.6);
+    min-width: 8px;
+}
+
+scrollbar slider:active {
+    background-color: @accent_color;
+}
+
+/* === List === */
+list, listview {
+    background-color: transparent;
+}
+
+list row, listview row {
+    padding: 6px 10px;
+    border-radius: 8px;
+    margin: 1px 4px;
+}
+
+list row:hover, listview row:hover {
+    background-color: rgba(255, 26, 26, 0.07);
+}
+
+list row:selected, listview row:selected {
+    background-color: rgba(255, 26, 26, 0.14);
+}
+
+/* === Check / Radio === */
+checkbutton check, radiobutton radio,
+check, radio {
+    background-color: #252525;
+    border: 2px solid rgba(255, 255, 255, 0.12);
+    border-radius: 4px;
+    min-width: 18px;
+    min-height: 18px;
+}
+
+checkbutton check:checked, radiobutton radio:checked,
+check:checked, radio:checked {
+    background: linear-gradient(135deg, #FF1A1A, #CC0000);
+    border-color: @accent_color;
+}
+
+radiobutton radio, radio {
+    border-radius: 50%;
+}
+
+/* === Progress === */
+progressbar trough {
+    background-color: #252525;
+    border-radius: 6px;
+    min-height: 6px;
+}
+
+progressbar progress {
+    background: linear-gradient(90deg, #CC0000, #FF1A1A, #FF4444);
+    border-radius: 6px;
+    min-height: 6px;
+    box-shadow: 0 0 6px rgba(255, 26, 26, 0.3);
+}
+
+/* === Popover === */
+popover, popover.background {
+    background-color: @popover_bg_color;
+    border: 1px solid rgba(255, 26, 26, 0.2);
+    border-radius: 12px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+}
+
+popover modelbutton:hover {
+    background-color: rgba(255, 26, 26, 0.1);
+    border-radius: 8px;
+}
+
+/* === Tab Bar === */
+tabbar tab {
+    background-color: transparent;
+    border-radius: 8px 8px 0 0;
+}
+
+tabbar tab:checked {
+    background-color: @window_bg_color;
+    border-bottom: 2px solid @accent_color;
+}
+
+/* === Notebook === */
+notebook > header tab:checked {
+    background-color: @window_bg_color;
+    border-bottom: 2px solid @accent_color;
+}
+
+/* === Tooltip === */
+tooltip, tooltip.background {
+    background-color: #1E1E1E;
+    color: @window_fg_color;
+    border: 1px solid rgba(255, 26, 26, 0.25);
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+}
+
+/* === Dialog === */
+messagedialog, dialog {
+    background-color: @window_bg_color;
+    border-radius: 16px;
+    border: 1px solid rgba(255, 26, 26, 0.15);
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.6);
+}
+
+/* === Separator === */
+separator {
+    background-color: rgba(255, 255, 255, 0.06);
+    min-height: 1px;
+    min-width: 1px;
+}
+
+/* === Navigation Sidebar === */
+.navigation-sidebar {
+    background-color: @sidebar_bg_color;
+    border-right: 1px solid rgba(255, 26, 26, 0.1);
+    padding: 6px;
+}
+
+.navigation-sidebar row {
+    border-radius: 8px;
+    margin: 2px 4px;
+    padding: 8px 12px;
+}
+
+.navigation-sidebar row:selected {
+    background-color: rgba(255, 26, 26, 0.15);
+}
+
+/* === Selection === */
+selection {
+    background-color: rgba(255, 26, 26, 0.3);
+    color: #FFFFFF;
+}
+
+/* === Linked buttons === */
+.linked > button {
+    border-radius: 0;
+}
+.linked > button:first-child {
+    border-radius: 8px 0 0 8px;
+}
+.linked > button:last-child {
+    border-radius: 0 8px 8px 0;
+}
+
+/* === AdwPreferencesGroup === */
+preferencesgroup {
+    margin: 12px;
+}
+
+/* === AdwActionRow === */
+row.activatable:hover {
+    background-color: rgba(255, 26, 26, 0.05);
+}
+
+/* === Boxed list === */
+.boxed-list {
+    background-color: @card_bg_color;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.boxed-list row {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.boxed-list row:last-child {
+    border-bottom: none;
+}
+
+/* === Status Page === */
+statuspage {
+    background-color: @window_bg_color;
+}
+
+/* === Spinner === */
+spinner {
+    color: @accent_color;
+}

@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=CoraOS
+Comment=CoraOS Desktop Environment
+Exec=/usr/bin/coraos-session
+TryExec=/usr/bin/coraos-shell
+Type=Application
+DesktopNames=CoraOS
+X-GDM-SessionRegisters=true

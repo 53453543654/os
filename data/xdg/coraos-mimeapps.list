@@ -1,0 +1,5 @@
+[Default Applications]
+text/html=dev.coraos.browser.desktop
+x-scheme-handler/http=dev.coraos.browser.desktop
+x-scheme-handler/https=dev.coraos.browser.desktop
+inode/directory=dev.coraos.files.desktop

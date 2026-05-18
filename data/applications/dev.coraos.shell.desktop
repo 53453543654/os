@@ -1,0 +1,12 @@
+[Desktop Entry]
+Name=CoraOS Shell
+Comment=CoraOS desktop shell component
+Exec=coraos-shell
+Icon=coraos-logo
+Terminal=false
+Type=Application
+NoDisplay=true
+Categories=System;
+X-GNOME-AutoRestart=true
+X-GNOME-Provides=panel;windowmanager;
+OnlyShowIn=CoraOS;

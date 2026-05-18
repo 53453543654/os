@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=WiFi
+Comment=Manage wireless network connections
+Exec=coraos-wifi
+Icon=network-wireless
+Terminal=false
+Type=Application
+Categories=System;Network;Settings;
+StartupNotify=true
+Keywords=wifi;wireless;network;connect;

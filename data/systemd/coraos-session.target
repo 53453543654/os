@@ -1,0 +1,6 @@
+[Unit]
+Description=CoraOS Session
+Documentation=https://coraos.dev
+BindsTo=graphical-session.target
+Wants=gnome-session-manager@coraos.service
+After=gnome-session-manager@coraos.service

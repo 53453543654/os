@@ -1,0 +1,86 @@
+/* CoraOS GTK3 Theme - Black & Red (Legacy Compatibility)
+ * Mirrors GTK4 theme for apps still using GTK3
+ * Copyright (C) 2024 CoraOS Contributors
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+
+@define-color theme_bg_color #0D0D0D;
+@define-color theme_fg_color #F0F0F0;
+@define-color theme_base_color #141414;
+@define-color theme_text_color #E8E8E8;
+@define-color theme_selected_bg_color #FF1A1A;
+@define-color theme_selected_fg_color #FFFFFF;
+@define-color borders rgba(255,255,255,0.08);
+
+* {
+    -GtkWidget-link-color: #FF1A1A;
+    -GtkWidget-visited-link-color: #CC4444;
+    outline-color: alpha(#FF1A1A, 0.5);
+}
+
+.background { background-color: @theme_bg_color; color: @theme_fg_color; }
+
+.titlebar, headerbar {
+    background-color: #1A1A1A;
+    color: @theme_fg_color;
+    border-bottom: 1px solid rgba(255, 26, 26, 0.3);
+    min-height: 42px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+button {
+    background-color: #252525;
+    color: @theme_fg_color;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 8px;
+    padding: 6px 14px;
+}
+button:hover { background-color: #303030; border-color: rgba(255, 26, 26, 0.4); }
+button:active { background-color: #1A1A1A; }
+button.suggested-action {
+    background-image: linear-gradient(180deg, #FF2222, #CC0000);
+    color: #FFFFFF; border-color: rgba(255, 26, 26, 0.6);
+}
+button.destructive-action {
+    background-image: linear-gradient(180deg, #FF4444, #CC2222);
+    color: #FFFFFF;
+}
+
+entry {
+    background-color: #181818; color: @theme_text_color;
+    border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px;
+    padding: 8px 12px;
+}
+entry:focus { border-color: #FF1A1A; box-shadow: 0 0 0 2px rgba(255, 26, 26, 0.2); }
+
+.view { background-color: @theme_base_color; color: @theme_text_color; }
+.view:selected, row:selected { background-color: rgba(255, 26, 26, 0.15); color: #FFF; }
+
+scrollbar slider { background-color: rgba(255, 26, 26, 0.4); border-radius: 10px; }
+scrollbar slider:hover { background-color: rgba(255, 26, 26, 0.7); }
+
+switch { background-color: #333; border-radius: 14px; }
+switch:checked { background-image: linear-gradient(90deg, #CC0000, #FF1A1A); }
+switch slider { background-color: #FFF; border-radius: 50%; }
+
+scale trough { background-color: #252525; border-radius: 6px; }
+scale highlight { background-image: linear-gradient(90deg, #CC0000, #FF1A1A); border-radius: 6px; }
+
+notebook > header tab:checked { background-color: @theme_bg_color; border-bottom: 2px solid #FF1A1A; }
+
+menu, .menu { background-color: #1A1A1A; border: 1px solid rgba(255, 26, 26, 0.2); border-radius: 12px; }
+menu menuitem:hover { background-color: rgba(255, 26, 26, 0.1); border-radius: 8px; }
+
+tooltip { background-color: #1E1E1E; color: @theme_fg_color; border: 1px solid rgba(255, 26, 26, 0.25); border-radius: 8px; }
+
+progressbar trough { background-color: #252525; border-radius: 6px; }
+progressbar progress { background-image: linear-gradient(90deg, #CC0000, #FF1A1A, #FF4444); border-radius: 6px; }
+
+check, radio { background-color: #252525; border: 2px solid rgba(255, 255, 255, 0.12); }
+check:checked, radio:checked { background-image: linear-gradient(135deg, #FF1A1A, #CC0000); border-color: #FF1A1A; }
+
+popover { background-color: #1A1A1A; border: 1px solid rgba(255, 26, 26, 0.2); border-radius: 12px; }
+
+separator { background-color: rgba(255, 255, 255, 0.06); }
+
+*:selected { background-color: rgba(255, 26, 26, 0.2); color: #FFFFFF; }

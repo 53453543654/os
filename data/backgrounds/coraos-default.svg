@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- CoraOS Default Wallpaper - SVG version (rasterize to PNG for production) -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" width="1920" height="1080">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0a0a0c"/>
+      <stop offset="50%" stop-color="#0f0808"/>
+      <stop offset="100%" stop-color="#060608"/>
+    </linearGradient>
+    <radialGradient id="orb" cx="70%" cy="45%" r="30%">
+      <stop offset="0%" stop-color="#FF1A1A" stop-opacity="0.08"/>
+      <stop offset="100%" stop-color="#FF1A1A" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="orb2" cx="25%" cy="70%" r="25%">
+      <stop offset="0%" stop-color="#880000" stop-opacity="0.05"/>
+      <stop offset="100%" stop-color="#880000" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <!-- Background gradient -->
+  <rect width="1920" height="1080" fill="url(#bg)"/>
+  <!-- Orbs -->
+  <rect width="1920" height="1080" fill="url(#orb)"/>
+  <rect width="1920" height="1080" fill="url(#orb2)"/>
+  <!-- Geometric arcs -->
+  <circle cx="1400" cy="350" r="300" fill="none" stroke="#FF1A1A" stroke-width="1.5" opacity="0.05"/>
+  <circle cx="1400" cy="350" r="200" fill="none" stroke="#FF1A1A" stroke-width="1" opacity="0.04"/>
+  <path d="M 400 800 A 400 400 0 0 1 800 600" fill="none" stroke="#CC0000" stroke-width="1.5" opacity="0.04"/>
+  <!-- Subtle grid -->
+  <pattern id="grid" width="80" height="80" patternUnits="userSpaceOnUse">
+    <path d="M 80 0 L 0 0 0 80" fill="none" stroke="#FF1A1A" stroke-width="0.3" opacity="0.03"/>
+  </pattern>
+  <rect width="1920" height="1080" fill="url(#grid)"/>
+  <!-- Diagonal accents -->
+  <line x1="600" y1="0" x2="1680" y2="1080" stroke="#FF1A1A" stroke-width="0.5" opacity="0.03"/>
+  <line x1="800" y1="0" x2="1880" y2="1080" stroke="#FF1A1A" stroke-width="0.5" opacity="0.02"/>
+  <!-- Logo mark (subtle) -->
+  <g transform="translate(1750, 1010)" opacity="0.04">
+    <path d="M 25 5 A 20 20 0 1 0 25 40" fill="none" stroke="#FF1A1A" stroke-width="4" stroke-linecap="round"/>
+  </g>
+</svg>

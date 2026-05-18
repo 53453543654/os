@@ -1,0 +1,7 @@
+[Desktop Entry]
+Name=CoraOS (X11)
+Comment=CoraOS Desktop Environment on X11
+Exec=/usr/bin/coraos-session --x11
+TryExec=/usr/bin/coraos-shell
+Type=Application
+DesktopNames=CoraOS

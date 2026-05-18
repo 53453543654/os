@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist>
+  <schema id="dev.coraos.shell" path="/dev/coraos/shell/">
+    <key name="panel-position" type="s">
+      <default>'top'</default>
+      <summary>Panel position</summary>
+      <description>Position of the top panel: top or bottom</description>
+    </key>
+    <key name="panel-height" type="i">
+      <default>32</default>
+      <summary>Panel height in pixels</summary>
+    </key>
+    <key name="panel-opacity" type="d">
+      <default>0.95</default>
+      <summary>Panel background opacity (0.0 to 1.0)</summary>
+    </key>
+    <key name="show-clock" type="b">
+      <default>true</default>
+      <summary>Show clock in panel</summary>
+    </key>
+    <key name="clock-format" type="s">
+      <default>'24h'</default>
+      <summary>Clock format: 12h or 24h</summary>
+    </key>
+    <key name="hot-corner" type="b">
+      <default>true</default>
+      <summary>Enable hot corner to open launcher</summary>
+    </key>
+    <key name="favorite-apps" type="as">
+      <default>['dev.coraos.browser.desktop', 'dev.coraos.files.desktop', 'dev.coraos.settings.desktop']</default>
+      <summary>Favorite applications shown in dock</summary>
+    </key>
+  </schema>
+
+  <schema id="dev.coraos.appearance" path="/dev/coraos/appearance/">
+    <key name="theme" type="s">
+      <default>'CoraOS-Dark'</default>
+      <summary>GTK theme name</summary>
+    </key>
+    <key name="icon-theme" type="s">
+      <default>'CoraOS'</default>
+      <summary>Icon theme name</summary>
+    </key>
+    <key name="accent-color" type="s">
+      <default>'#FF1A1A'</default>
+      <summary>Accent color in hex</summary>
+    </key>
+    <key name="font" type="s">
+      <default>'Noto Sans 11'</default>
+      <summary>Interface font</summary>
+    </key>
+    <key name="monospace-font" type="s">
+      <default>'Fira Mono 10'</default>
+      <summary>Monospace font</summary>
+    </key>
+    <key name="animations" type="b">
+      <default>true</default>
+      <summary>Enable animations</summary>
+    </key>
+    <key name="animation-speed" type="d">
+      <default>1.0</default>
+      <summary>Animation speed multiplier</summary>
+    </key>
+    <key name="corner-radius" type="i">
+      <default>12</default>
+      <summary>Window corner radius in pixels</summary>
+    </key>
+    <key name="transparency" type="b">
+      <default>true</default>
+      <summary>Enable transparency effects</summary>
+    </key>
+    <key name="dark-mode" type="b">
+      <default>true</default>
+      <summary>Use dark mode</summary>
+    </key>
+    <key name="wallpaper" type="s">
+      <default>'/usr/share/backgrounds/coraos/default.png'</default>
+      <summary>Wallpaper path</summary>
+    </key>
+    <key name="wallpaper-mode" type="s">
+      <default>'zoom'</default>
+      <summary>Wallpaper scaling mode</summary>
+    </key>
+  </schema>
+</schemalist>

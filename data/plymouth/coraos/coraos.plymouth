@@ -1,0 +1,8 @@
+[Plymouth Theme]
+Name=CoraOS
+Description=CoraOS Boot Splash - Red accent on dark
+ModuleName=script
+
+[script]
+ImageDir=/usr/share/plymouth/themes/coraos
+ScriptFile=/usr/share/plymouth/themes/coraos/coraos.script

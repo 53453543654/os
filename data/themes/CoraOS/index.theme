@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=X-GNOME-Metatheme
+Name=CoraOS
+Comment=CoraOS Dark Theme with Red Accents
+Encoding=UTF-8
+
+[X-GNOME-Metatheme]
+GtkTheme=CoraOS
+MetacityTheme=CoraOS
+IconTheme=CoraOS
+CursorTheme=Adwaita
+ButtonLayout=:minimize,maximize,close

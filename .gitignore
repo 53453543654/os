@@ -1,0 +1,15 @@
+# Build output
+builddir/
+build/out/
+*.o
+*.so
+*.a
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*~
+
+# Generated
+compile_commands.json

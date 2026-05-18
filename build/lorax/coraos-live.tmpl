@@ -1,0 +1,44 @@
+## CoraOS Lorax Template
+## Used by livemedia-creator for ISO generation
+
+<%page args="kernels, runtime_img, basearch, inroot, outroot, product, isolabel"/>
+
+## Create output directories
+mkdir ${outroot}/EFI/BOOT
+mkdir ${outroot}/images/pxeboot
+mkdir ${outroot}/LiveOS
+
+## Install bootloaders
+<% efiarch = 'x64' if basearch == 'x86_64' else 'aa64' %>
+install boot/efi/EFI/*/shim${efiarch}.efi ${outroot}/EFI/BOOT/BOOT${efiarch.upper()}.EFI
+install boot/efi/EFI/*/grub${efiarch}.efi ${outroot}/EFI/BOOT/grub${efiarch}.efi
+
+## GRUB Configuration
+cat > ${outroot}/EFI/BOOT/grub.cfg << 'GRUBEOF'
+set default="0"
+set timeout=5
+
+menuentry "CoraOS 1.0 (Ember) Live" --class coraos --class os {
+    linuxefi /images/pxeboot/vmlinuz root=live:CDLABEL=CoraOS-1-0 rd.live.image quiet rhgb
+    initrdefi /images/pxeboot/initrd.img
+}
+
+menuentry "CoraOS 1.0 - Troubleshooting" --class coraos {
+    linuxefi /images/pxeboot/vmlinuz root=live:CDLABEL=CoraOS-1-0 rd.live.image systemd.unit=multi-user.target
+    initrdefi /images/pxeboot/initrd.img
+}
+
+menuentry "CoraOS 1.0 - Install to Disk" --class coraos {
+    linuxefi /images/pxeboot/vmlinuz root=live:CDLABEL=CoraOS-1-0 rd.live.image inst.stage2=hd:LABEL=CoraOS-1-0 quiet
+    initrdefi /images/pxeboot/initrd.img
+}
+GRUBEOF
+
+## Copy kernel and initrd
+%for kernel in kernels:
+    install boot/vmlinuz-${kernel.version} ${outroot}/images/pxeboot/vmlinuz
+    install boot/initramfs-${kernel.version}.img ${outroot}/images/pxeboot/initrd.img
+%endfor
+
+## Runtime image
+install ${runtime_img} ${outroot}/LiveOS/squashfs.img
