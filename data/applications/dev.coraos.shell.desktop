@@ -9,4 +9,4 @@ NoDisplay=true
 Categories=System;
 X-GNOME-AutoRestart=true
 X-GNOME-Provides=panel;windowmanager;
-OnlyShowIn=CoraOS;
+OnlyShowIn=X-CoraOS;
